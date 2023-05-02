@@ -39,7 +39,7 @@ class Robot:
     def logics(self) -> None:
         match self.action:
             case Robot.Action.POST_INIT:
-                closest_point = self.scanner.closest_point(Point(*self.position))
+                closest_point = self.scanner.points_index.get_closest(*self.position)
                 for line in self.scanner.result_lines:
                     if line.point_right == closest_point or line.point_left == closest_point:
                         self.closest_line = line
@@ -66,7 +66,7 @@ class Robot:
     def move_forward(self) -> bool:
         dx, dy = dx_dy(self.speed, self.radians)
         position = self.position[0] + dx, self.position[1] + dy
-        if distance(*self.scanner.closest_point(Point(*position)).position, *position) < self.radius:
+        if distance(*self.scanner.points_index.get_closest(*position).position, *position) < self.radius:
             return True
         self.position = position
         return False

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from rtree import index
 import math
 from typing import TYPE_CHECKING, List, Tuple
+
 if TYPE_CHECKING:
     from simulation import Simulation
 from constants import WIN_WIDTH, WIN_HEIGHT
@@ -32,6 +34,12 @@ class Line:
         self.radians: float = math.atan(self.slope) if self.slope != float("inf") else math.radians(90)
         self.length: float = distance(self.point_left.x, self.point_left.y, self.point_right.x, self.point_right.y)
 
+        min_x = self.point_left.x
+        min_y = min(self.point_left.y, self.point_right.y)
+        max_x = self.point_right.x
+        max_y = max(self.point_left.y, self.point_right.y)
+        self.bounding_box: Tuple[float, float, float, float] = min_x, min_y, max_x, max_y
+
     def join(self, other: Line) -> Line:
         points = [self.point_left, self.point_right, other.point_left, other.point_right]
         new_lines = []
@@ -47,6 +55,32 @@ class Line:
               distance(*self.point_right.position, *other.point_left.position),
               distance(*self.point_right.position, *other.point_right.position)]
         return min(ds)
+
+
+class PointsIndex:
+    def __init__(self):
+        p = index.Property()
+        p.dimension = 2
+        self.index: index.Index = index.Index(properties=p)
+        self.points: List[Point] = []
+
+    def add(self, point: Point):
+        self.points.append(point)
+        self.index.insert(len(self.points), (point.x, point.y, point.x, point.y), obj=point)
+
+    def get(self, x: float, y: float):
+        return list(self.index.intersection((x, y, x, y), objects=True))[0].object
+
+    def get_closest(self, x: float, y: float, exclude_self: bool = False):
+        points = self.index.nearest((x, y, x, y), objects=True, num_results=2)
+
+        filtered = filter(lambda p: exclude_self is False or p.object.x != x or p.object.y != y, points)
+        n = next(filtered, None)
+        return n.object if n is not None else n
+
+    def get_closest_except(self, x: float, y: float, ignored: List[Point]):
+        points = self.index.nearest((x, y, x, y), objects=True, num_results=len(ignored) + 1)
+        return next(filter(lambda p: p.object not in ignored, points)).object
 
 
 class Raycast:
@@ -93,28 +127,8 @@ class Scanner:
     def __init__(self, simulation: Simulation) -> None:
         self.simulation: Simulation = simulation
         self.raycast: Raycast = Raycast(self.simulation.surface, 300, 5, (255, 255, 255))
-        self.result_points: List[Point] = []
         self.result_lines: List[Line] = []
-
-    def too_close(self, point: Point, dist: float) -> bool:
-        for p in self.result_points:
-            if distance(p.x, p.y, point.x, point.y) <= dist:
-                return True
-
-        return False
-
-    def closest_point(self, point: Point, ignore: List[Point] = None) -> Point:
-        closest = None
-        dist = float("inf")
-        for p in self.result_points:
-            if p == point or (ignore and p in ignore):
-                continue
-            d = distance(p.x, p.y, point.x, point.y)
-            if d < dist:
-                dist = d
-                closest = p
-
-        return closest
+        self.points_index: PointsIndex = PointsIndex()
 
     def scan(self) -> None:
         self.result_lines = []
@@ -127,18 +141,29 @@ class Scanner:
             x, y = xy
 
             point = Point(x, y)
-            if self.too_close(point, 5):
+            closest = self.points_index.get_closest(x, y)
+            if closest and distance(*self.points_index.get_closest(x, y).position, x, y) <= 5:
                 continue
-            self.result_points.append(point)
+            self.points_index.add(point)
 
         visited_points = []
-        point = self.result_points[0]
-        while len(visited_points) != len(self.result_points) - 1:
+        point = self.points_index.points[0]
+        while len(visited_points) != len(self.points_index.points) - 1:
             visited_points.append(point)
-            closest = self.closest_point(point, visited_points)
+            closest = self.points_index.get_closest_except(point.x, point.y, visited_points)
+            # print(distance(closest.x, closest.y, point.x, point.y))
             if distance(closest.x, closest.y, point.x, point.y) <= self.simulation.robot.radius:
                 self.result_lines.append(Line(point, closest))
             point = closest
+
+        # visited_points = []
+        # point = self.result_points[0]
+        # while len(visited_points) != len(self.result_points) - 1:
+        #     visited_points.append(point)
+        #     closest = self.closest_point(point, visited_points)
+        #     if distance(closest.x, closest.y, point.x, point.y) <= self.simulation.robot.radius:
+        #         self.result_lines.append(Line(point, closest))
+        #     point = closest
 
         # updated_lines = []
         # current_line = None
@@ -158,9 +183,9 @@ class Scanner:
         # self.result_lines = updated_lines
 
     def draw_dots(self) -> None:
-        # for point in self.result_points:
-        #     pg.draw.circle(self.simulation.surface, (0, 255, 0), point.position, 3)
-        ...
+        for point in self.points_index.points:
+            pg.draw.circle(self.simulation.surface, (0, 255, 0), point.position, 3)
+        # ...
 
     def draw_lines(self) -> None:
         for line in self.result_lines:
