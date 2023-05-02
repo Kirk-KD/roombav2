@@ -10,7 +10,7 @@ class Simulation:
         self.clock: pg.time.Clock = pg.time.Clock()
         self.surface: pg.Surface = pg.display.set_mode(WIN_SIZE)
         self.image: pg.Surface = pg.transform.scale(pg.image.load("room.png"), WIN_SIZE)
-        self.robot: Robot = Robot(self, 15, (250, 300), 2)
+        self.robot: Robot = Robot(self, 15, (250, 600), 2)
 
     def __frame(self) -> None:
         self.clock.tick()
