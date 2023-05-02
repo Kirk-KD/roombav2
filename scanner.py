@@ -4,6 +4,7 @@ import math
 from typing import TYPE_CHECKING, List, Tuple
 if TYPE_CHECKING:
     from simulation import Simulation
+from constants import WIN_WIDTH, WIN_HEIGHT
 
 import pygame as pg
 
@@ -15,6 +16,9 @@ class Point:
         self.x: float = x
         self.y: float = y
         self.position: Tuple[float, float] = self.x, self.y
+
+    def __eq__(self, other) -> bool:
+        return self.x == other.x and self.y == other.y
 
 
 class Line:
@@ -64,7 +68,8 @@ class Raycast:
         dx, dy = dx_dy(self.hop_dist, rad)
         dx_small, dy_small = dx_dy(1, rad)
 
-        while distance(starting_position[0], starting_position[1], x, y) < self.max_dist:
+        while (distance(starting_position[0], starting_position[1], x, y) < self.max_dist and
+               0 <= x < WIN_WIDTH and 0 <= y < WIN_HEIGHT):
             pixel_x = int(x)
             pixel_y = int(y)
             if self.surface.get_at((pixel_x, pixel_y)) == self.color_mask:
@@ -87,7 +92,7 @@ class Raycast:
 class Scanner:
     def __init__(self, simulation: Simulation) -> None:
         self.simulation: Simulation = simulation
-        self.raycast: Raycast = Raycast(self.simulation.surface, 900, 5, (255, 255, 255))
+        self.raycast: Raycast = Raycast(self.simulation.surface, 300, 5, (255, 255, 255))
         self.result_points: List[Point] = []
         self.result_lines: List[Line] = []
 
@@ -131,30 +136,31 @@ class Scanner:
         while len(visited_points) != len(self.result_points) - 1:
             visited_points.append(point)
             closest = self.closest_point(point, visited_points)
-            if distance(closest.x, closest.y, point.x, point.y) <= self.simulation.robot.radius * 2:
+            if distance(closest.x, closest.y, point.x, point.y) <= self.simulation.robot.radius:
                 self.result_lines.append(Line(point, closest))
             point = closest
 
-        updated_lines = []
-        current_line = None
-        for i in range(len(self.result_lines)):
-            line = self.result_lines[i]
-
-            if current_line is None:
-                current_line = line
-                continue
-
-            if abs(line.radians - current_line.radians) <= math.radians(5) and line.distance(current_line) <= 5:
-                current_line = current_line.join(line)
-            else:
-                updated_lines.append(current_line)
-                current_line = line
-
-        self.result_lines = updated_lines
+        # updated_lines = []
+        # current_line = None
+        # for i in range(len(self.result_lines)):
+        #     line = self.result_lines[i]
+        #
+        #     if current_line is None:
+        #         current_line = line
+        #         continue
+        #
+        #     if abs(line.radians - current_line.radians) <= math.radians(5) and line.distance(current_line) <= 10:
+        #         current_line = current_line.join(line)
+        #     else:
+        #         updated_lines.append(current_line)
+        #         current_line = line
+        #
+        # self.result_lines = updated_lines
 
     def draw_dots(self) -> None:
-        for point in self.result_points:
-            pg.draw.circle(self.simulation.surface, (0, 255, 0), point.position, 3)
+        # for point in self.result_points:
+        #     pg.draw.circle(self.simulation.surface, (0, 255, 0), point.position, 3)
+        ...
 
     def draw_lines(self) -> None:
         for line in self.result_lines:

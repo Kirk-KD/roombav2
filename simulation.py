@@ -1,8 +1,7 @@
 import pygame as pg
 
 from robot import Robot
-
-WIN_SIZE = WIN_WIDTH, WIN_HEIGHT = 900, 900
+from constants import WIN_SIZE
 
 
 class Simulation:
@@ -10,8 +9,8 @@ class Simulation:
         self.running: bool = False
         self.dt: float = 1
         self.surface: pg.Surface = pg.display.set_mode(WIN_SIZE)
-        self.image: pg.Surface = pg.image.load("1.png")
-        self.robot: Robot = Robot(self, 20, (100, 100), 100)
+        self.image: pg.Surface = pg.transform.scale(pg.image.load("room.png"), WIN_SIZE)
+        self.robot: Robot = Robot(self, 15, (250, 300), 2)
 
     def __frame(self) -> None:
         self.surface.blit(self.image, (0, 0))
